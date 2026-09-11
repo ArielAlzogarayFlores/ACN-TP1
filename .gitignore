@@ -1,0 +1,8 @@
+# Excluir directorio del entorno virtual de Python
+/.venv/
+
+# Excluir configuraciones del entorno en vscode
+/.vscode/
+
+# Excluir los resultados
+resultados/*.txt
