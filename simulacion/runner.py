@@ -1,3 +1,5 @@
+import os
+from datetime import datetime
 from ambiente_fisico import PlaneModel
 
 METHODS = ['rand', 'btf', 'wilma', 'stfn']
@@ -55,5 +57,38 @@ def run_simulations(
             results[method].append(time)
 
             print(f"{method} simulación {i+1}/{n_simulations}: {time}s")
-
     return results
+
+def save_results(
+    results: dict[str, list[int]],
+    n_passengers: int,
+    p_carryon: float,
+    output_dir: str = '../resultados',
+) -> str:
+    """
+    Guarda los resultados de run_simulations() en un archivo .txt en output_dir.
+    Incluye los tiempos individuales y el promedio por método.
+    Devuelve el path del archivo generado.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+ 
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = os.path.join(output_dir, f'resultados_{timestamp}.txt')
+ 
+    n_simulations = len(next(iter(results.values())))
+ 
+    with open(filename, 'w') as f:
+        f.write(f"Resultados de simulación — {timestamp}\n")
+        f.write(f"Pasajeros: {n_passengers} | P(carry-on): {p_carryon} | Simulaciones por política: {n_simulations}\n")
+        f.write("=" * 60 + "\n\n")
+ 
+        for method, times in results.items():
+            avg = sum(times) / len(times)
+            f.write(f"[{method}]\n")
+            f.write(f"  Promedio : {avg:.1f}s\n")
+            f.write(f"  Mínimo   : {min(times)}s\n")
+            f.write(f"  Máximo   : {max(times)}s\n")
+            f.write(f"  Tiempos  : {times}\n\n")
+ 
+    print(f"Resultados guardados en {filename}")
+    return filename

@@ -20,9 +20,8 @@ A continuación, la estructura del repositorio:
 ├── resultados/                # Archivos .txt con los resultados de las simulaciones
 |
 ├── simulacion/
-│   ├── ambiente_fisico.py     # Representación del avión como espacio físico: filas, asientos, pasillo y unidades de tiempo (reloj)
+│   ├── ambiente_fisico.py     # Representación del avión como espacio físico: filas, asientos, métodos de abordaje, pasillo y unidades de tiempo (reloj)
 │   ├── agente.py              # Estado, acciones y reglas de comportamiento e interacción de los pasajeros
-│   ├── politicas.py           # Back-to-Front, Random, WILMA, Steffen
 │   └── runner.py              # Corre N simulaciones y devuelve resultados
 │
 ├── .gitignore
