@@ -89,3 +89,11 @@ class PlaneModel:
         for agent in self.agents:
             agent.orchestrator()
         self.time += 1
+
+    def all_passengers_seated(self):
+        res:bool = False
+        n_passengers_seated:int = 0
+        for passenger in self.agents:
+            if passenger.arrived_at_seat is True: n_passengers_seated += 1
+        if n_passengers_seated == len(self.queue): res = True
+        return res

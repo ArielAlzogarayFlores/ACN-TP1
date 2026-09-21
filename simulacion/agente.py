@@ -1,3 +1,6 @@
+# Para que cuando lidiemos con la clase PlaneModel deje pasar que aún no esta
+# es como una necesidad de ambas clases y lo obviamos con esto
+from __future__ import annotations
 import random
 
 # Constantes de utilidad respecto a los intervalos de tiempo
@@ -13,7 +16,7 @@ GET_UP_MIN = 3
 GET_UP_MAX = 5
 
 class PassengerAgent:
-    def __init__(self, seat: tuple[int, int], carryon: bool, plane: Plane):  # type: ignore
+    def __init__(self, seat: tuple[int, int], carryon: bool, plane: PlaneModel):  # type: ignore
         self.seat: tuple[int, int] = seat
         self.carryon: bool = carryon
         self.arrived_at_seat: bool = False
