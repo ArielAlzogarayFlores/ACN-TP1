@@ -79,10 +79,8 @@ class PlaneModel:
             self.passenger_at_seat[seat] = pasajero
  
     def is_cell_occupied(self, cell: tuple[int, int]):
-        if self.plane_grid[cell] == 1:
-            return True
-        return False
- 
+        return self.plane_grid[cell] == 1
+
     def step(self):
         for agent in self.agents:
             agent.activate()

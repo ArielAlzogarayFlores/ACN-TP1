@@ -218,6 +218,6 @@ class PassengerAgent:
         # Si la celda a la que avanzó el pasajero es aquella correspondiente a su asiento
         # entonces determinamos que el pasajero comienza a sentarse
         if self.cell == self.seat:
-            # Llegó a su asiento: ahora tarda un rato en sentarse
+            # Llegó a su asiento, ahora tarda un rato en sentarse
             self.state = 'sitting'
             self.timer = random.randint(SIT_MIN, SIT_MAX)
