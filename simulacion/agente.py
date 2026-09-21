@@ -62,7 +62,7 @@ class PassengerAgent:
 
         # Indica si el pasajero guardo el equipaje de mano solo si es que
         # efectivamente posee equipaje de mano en primer lugar
-        if carryon is True:
+        if carryon == True:
             self.carryon_stored: bool | None = False
         else:
             self.carryon_stored: bool | None = None
@@ -136,7 +136,7 @@ class PassengerAgent:
         print(f"Agente del asiento {self.seat} se levanta para dejar pasar en el momento t={self.plane.time} segundos.")
 
     # Método para levantarse de su asiento
-    # Viene precedido de una solicitud para que uno se levante mediada por un pasajero ajeno
+    # Viene precedido de una solicitud para que uno se levante mediada por otro pasajero
     # Una vez el pasajero se levanta procede a intercambiar posiciones con el pasajero que hizo la solicitud
     def get_up(self):
         self.timer -= 1
@@ -144,58 +144,79 @@ class PassengerAgent:
             self.plane.plane_grid[self.seat] = 0
             self.state = 'exchanging_positions'
 
-    # Método de intercambio de posiciones para que el pasajero que se levante y aquel que quiere sentarse lo hagan
+    # Método de intercambio de posiciones entre dos pasajeros
     # Ya el que se tenía que levantar está de pie. Se vuelve a sentar recién cuando la celda de su asiento queda libre 
     # (es decir, cuando el que pasaba ya siguió hacia su propio asiento). Así evitamos que los dos ocupen la misma celda
     def exchange_positions(self):
+        # Liberamos la posición del asiento del pasajero que hizo la solicitud
         if self.plane.plane_grid[self.seat] == 0:
             self.plane.plane_grid[self.seat] = 1
             self.state = 'seated'
             print(f"Agente del asiento {self.seat} se vuelve a sentar en el momento t={self.plane.time} segundos.")
 
     # Método para avanzar hacia el asiento
+    # Ejecuta todo lo referido a desplazamiento en la grilla del avión según la circunstancia del pasajero
     def walk_forward(self):
-        if self.cell is None:
+
+        # Si el pasajero no tiene celda asignada, comienza por defecto al comienzo en el pasillo del avión
+        if self.cell == None:
             next_cell = (0, 2)
+
+        # En caso de que ya posea una posición...
         else:
             cell_row, cell_col = self.cell
             seat_row, seat_col = self.seat
+
+            # Si esta en una fila inferior a la que debe sentarse, avanza en el pasillo hacia adelante
             if cell_row < seat_row:
                 next_cell = (cell_row + 1, cell_col)
+
+            # Si ya llegó a la fila de su asiento estando en el pasillo, tiene equipaje de mando y no lo guardo...
+            # Recordar que siempre asumimos que el pasajero guarda su equipaje antes de llegar a los asientos
             elif cell_col == 2 and self.carryon and not self.carryon_stored:
-                # Llega al pasillo de la fila, antes de ir al asiento guarda
-                # el equipaje, y luego se sienta o espera que lo dejen pasar
+                # Comienza a guardar el equipaje
                 self.state = 'storing_carryon'
+                # Comienza el tiempo de demora para guardar el equipaje
                 self.timer = random.randint(STORE_CARRYON_MIN, STORE_CARRYON_MAX)
                 print(f"Agente del asiento {self.seat} guarda su equipaje de mano en el momento t={self.plane.time} segundos.")
                 return
+            # Si ya llego a la fila de su asiento en el pasillo pero no tiene equipaje de mano o ya lo guardo, avanza hacia su asiento 
             elif cell_col < seat_col:
                 next_cell = (cell_row, cell_col + 1)
             else:
                 next_cell = (cell_row, cell_col - 1)
 
+        # Si el lugar hacia el que debe avanzar esta ocupado por otro pasajero...
         if self.plane.is_cell_occupied(next_cell):
-            if self.cell is not None:
+
+            # Si tengo una posición asignada...
+            if self.cell != None:
                 cell_row, cell_col = self.cell
                 next_row, next_col = next_cell
+
+                # Si debo pedirle a un pasajero que se levante para yo poder pasar
                 if cell_row == next_row and next_col != cell_col:
-                    # Nos bloquea alguien en la misma fila (no en el
-                    # pasillo): si ya está sentado, le pedimos que se pare
+                    # Si ya está sentado, le solicitmaos que se levante de su asiento
                     adjacent_passenger = self.plane.passenger_at_seat.get(next_cell)
-                    if adjacent_passenger is not None and adjacent_passenger.state == 'seated':
+                    if adjacent_passenger != None and adjacent_passenger.state == 'seated':
                         adjacent_passenger.receive_get_up_request()
-                # Si no, es alguien delante en el pasillo: no se hace nada
+                # Si no, es alguien delante en el pasillo no se hace nada
                 # más que esperar a que se mueva. En ambos casos,
-                # se queda esperando sin hacer nada un turno.
+                # se queda esperando sin hacer nada un turno
+            # Si no tengo una posición asignada no tengo nada por hacer...
             return
 
-        # Solo liberamos la celda anterior si existía (self.cell != None)
+        # Solo liberamos la celda anterior si previamente el pasajero tenía una celda asignada
+        # De este modo, actualizamos la posición del pasajero concretando su avance hacia el asiento
         prev_cell = self.cell
         self.cell = next_cell
-        if prev_cell is not None:
+        if prev_cell != None:
             self.plane.plane_grid[prev_cell] = 0
         self.plane.plane_grid[self.cell] = 1
         print(f"Agente del asiento {self.seat} avanza a {self.cell} en el momento t={self.plane.time} segundos.")
+
+        # Si la celda a la que avanzó el pasajero es aquella correspondiente a su asiento
+        # entonces determinamos que el pasajero comienza a sentarse
         if self.cell == self.seat:
             # Llegó a su asiento: ahora tarda un rato en sentarse
             self.state = 'sitting'
