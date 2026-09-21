@@ -94,6 +94,6 @@ class PlaneModel:
         res:bool = False
         n_passengers_seated:int = 0
         for passenger in self.agents:
-            if passenger.arrived_at_seat is True: n_passengers_seated += 1
+            if passenger.state is 'seated': n_passengers_seated += 1
         if n_passengers_seated == len(self.queue): res = True
         return res
