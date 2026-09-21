@@ -19,6 +19,8 @@ GET_UP_MAX = 5
 class PassengerAgent:
 
     # Método constructor de la clase pasajero
+    # seat es el asiento del pasajero, carryon indica si tiene equipaje de mano
+    # y plane refiere al avión al que debe abordar
     def __init__(self, seat: tuple[int, int], carryon: bool, plane: PlaneModel):  # type: ignore
 
         # Atributos de la clase pasajero
@@ -73,7 +75,7 @@ class PassengerAgent:
         if self.is_active:
             return
         self.is_active = True
-        print(f"Agente del asiento {self.seat} ingresa al avión en el momento t={self.plane.time} segundos.")
+        # print(f"Agente del asiento {self.seat} ingresa al avión en el momento t={self.plane.time} segundos.")
 
     # Método orquestrador
     # Determina las acciones de cada agente pasajero según el estado en qué se encuentre
@@ -122,7 +124,7 @@ class PassengerAgent:
         if self.timer == 0:
             self.state = 'seated'
             self.arrived_at_seat = True
-            print(f"Agente del asiento {self.seat} se sienta en el momento t={self.plane.time} segundos.")
+            # print(f"Agente del asiento {self.seat} se sienta en el momento t={self.plane.time} segundos.")
 
     # Método para pedirle a un pasajero que se levante de su asiento
     # Este método no lo llama nunca un agente por su cuenta sino que el agente lo llama para el pasajero adyacente
@@ -133,7 +135,7 @@ class PassengerAgent:
         # El pasajero adyacente comienza a levantarse
         self.state = 'getting_up'
         self.timer = random.randint(GET_UP_MIN, GET_UP_MAX)
-        print(f"Agente del asiento {self.seat} se levanta para dejar pasar en el momento t={self.plane.time} segundos.")
+        # print(f"Agente del asiento {self.seat} se levanta para dejar pasar en el momento t={self.plane.time} segundos.")
 
     # Método para levantarse de su asiento
     # Viene precedido de una solicitud para que uno se levante mediada por otro pasajero
@@ -152,7 +154,7 @@ class PassengerAgent:
         if self.plane.plane_grid[self.seat] == 0:
             self.plane.plane_grid[self.seat] = 1
             self.state = 'seated'
-            print(f"Agente del asiento {self.seat} se vuelve a sentar en el momento t={self.plane.time} segundos.")
+            # print(f"Agente del asiento {self.seat} se vuelve a sentar en el momento t={self.plane.time} segundos.")
 
     # Método para avanzar hacia el asiento
     # Ejecuta todo lo referido a desplazamiento en la grilla del avión según la circunstancia del pasajero
@@ -178,7 +180,7 @@ class PassengerAgent:
                 self.state = 'storing_carryon'
                 # Comienza el tiempo de demora para guardar el equipaje
                 self.timer = random.randint(STORE_CARRYON_MIN, STORE_CARRYON_MAX)
-                print(f"Agente del asiento {self.seat} guarda su equipaje de mano en el momento t={self.plane.time} segundos.")
+                # print(f"Agente del asiento {self.seat} guarda su equipaje de mano en el momento t={self.plane.time} segundos.")
                 return
             # Si ya llego a la fila de su asiento en el pasillo pero no tiene equipaje de mano o ya lo guardo, avanza hacia su asiento 
             elif cell_col < seat_col:
@@ -213,7 +215,7 @@ class PassengerAgent:
         if prev_cell != None:
             self.plane.plane_grid[prev_cell] = 0
         self.plane.plane_grid[self.cell] = 1
-        print(f"Agente del asiento {self.seat} avanza a {self.cell} en el momento t={self.plane.time} segundos.")
+        # print(f"Agente del asiento {self.seat} avanza a {self.cell} en el momento t={self.plane.time} segundos.")
 
         # Si la celda a la que avanzó el pasajero es aquella correspondiente a su asiento
         # entonces determinamos que el pasajero comienza a sentarse
