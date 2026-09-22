@@ -11,6 +11,9 @@ import contextlib
 # Importamos el ambiente de nuestro modelo, el avión
 from ambiente_fisico import PlaneModel
 
+# Importamos las funciones de visualización
+from animacion import animar_embarque
+
 # Políticas de embarque que simulamos por defecto
 METHODS = ['rand', 'btf', 'wilma', 'stfn']
 
@@ -50,6 +53,55 @@ def run_single(n_passengers: int, p_carryon: float, method: str, verbose: bool =
         print(f"{method}: embarque completo en {model.time}s")
 
     return model.time
+
+# Método para visualizar una simulación de un tipo de embarque
+def run_and_show(
+    n_passengers: int = 100,
+    p_carryon: float = 0.5,
+    method:str = 'rand',
+) -> str:
+    """
+    Corre una simulación con la política seleccionada y guarda un GIF con su visualización.
+
+    Parámetros:
+        n_passengers:  cantidad de pasajeros.
+        p_carryon:     probabilidad de que un pasajero tenga carry-on.
+        method:       política a simular.
+
+    """
+    # Creamos el avión con sus pasajeros según la política elegida
+    model = PlaneModel(n=n_passengers, p=p_carryon, onboarding_method=method)
+
+    # Redirigimos la salida a un buffer que después se descarta
+    salida = contextlib.redirect_stdout(io.StringIO())
+
+    # Creamos un archivo de texto en el cual guardamos el plane_grid para cada momento en el tiempo
+    output_dir: str = '../resultados'
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = os.path.join(output_dir, f'simulaciones/sim_record_{timestamp}.txt')
+    sr = open(file=filename, mode='x')
+
+    # Avanzamos la simulación segundo a segundo hasta que todos estén
+    # sentados o se alcance el límite de pasos
+    with salida:
+        while not model.all_passengers_seated() and model.time < MAX_STEPS:
+            model.step()
+            sr.write(str(model.plane_grid))
+
+
+    # Esta advertencia se muestra siempre, aunque verbose sea False, porque
+    # indica que el resultado de esta simulación no es válido
+    if not model.all_passengers_seated():
+        print(f"Advertencia sobre {method}: no todos se sentaron en {MAX_STEPS} pasos.")
+
+    sr.close()
+
+    ruta_gif = animar_embarque(
+        ruta_txt=filename,
+        nombre_salida=f"{method}.gif",   # p.ej. "steffen.gif", "back_to_front.gif"
+        titulo=f"Política: {method}",
+    )
+    return ruta_gif
 
 # Método para correr n simulaciones por cada política de embarque
 def run_simulations(

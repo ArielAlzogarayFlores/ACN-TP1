@@ -1,82 +1,83 @@
 """
-Visualizador de embarque de avión.
+analisis/animacion.py
 
-Toma una secuencia (historial) de matrices de asientos (25 filas x 5 columnas,
-columna del medio = pasillo, 1 = ocupado, 0 = libre) y genera una animación
-en GIF donde se ve el avión, los asientos, y a la gente sentándose paso a paso.
+Genera una animación (GIF) del embarque del avión a partir del archivo .txt
+que graba `ambiente_fisico.py` con todos los estados de la grilla.
 
-Uso básico:
-    from visualizador_embarque import animar_embarque
-    animar_embarque(historial, "mi_embarque.gif", titulo="Política Back-to-Front")
+Uso típico desde runner.py / el notebook:
 
-Donde `historial` es una lista de arrays numpy de forma (25, 5), uno por cada
-paso de la simulación (el estado de la matriz en ese instante).
+    from analisis.animacion import animar_embarque
+
+    ruta_gif = animar_embarque(
+        "resultados/simulation_record.txt",
+        titulo="Política: Steffen",
+    )
+
+Guarda el GIF en resultados/visualizaciones/ (la crea si no existe) y
+devuelve la ruta del archivo generado.
 """
+
+import os
+import re
+from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-# ---------- Paleta de colores (pensada para que se distinga fácil) ----------
-COLOR_LIBRE = "#E8F5E9"       # verde clarito = asiento vacío
+# ---------- Rutas de assets propios de este módulo (funcionan sea cual sea el cwd) ----------
+_DIR_MODULO = Path(__file__).resolve().parent
+FUSELAJE_VECTOR_DEFAULT = str(_DIR_MODULO / "assets" / "avion_vector.png")
+
+# ---------- Paleta de colores ----------
+COLOR_LIBRE = "#E8F5E9"
 COLOR_BORDE_LIBRE = "#81C784"
-COLOR_OCUPADO = "#64B5F6"     # azul = ya sentado hace rato
+COLOR_OCUPADO = "#64B5F6"
 COLOR_BORDE_OCUPADO = "#1976D2"
-COLOR_NUEVO = "#FFB74D"       # naranja = se acaba de sentar en ESTE paso
+COLOR_NUEVO = "#FFB74D"
 COLOR_BORDE_NUEVO = "#E65100"
 COLOR_PASILLO = "#F5F5F5"
 COLOR_FUSELAJE = "#37474F"
-COLOR_CAMINANDO = "#AB47BC"   # violeta = persona parada/caminando en el pasillo
+COLOR_CAMINANDO = "#AB47BC"
 COLOR_BORDE_CAMINANDO = "#6A1B9A"
 
 
-def _dibujar_avion(ax, filas, cols_por_lado, escala=1.0):
-    """Dibuja el contorno del avión (fuselaje, nariz y cola) como fondo."""
-    ancho_total = (2 * cols_por_lado + 1) * escala  # +1 por el pasillo
-    alto_total = filas * escala
+# ============================================================
+# 1. Parseo del .txt -> lista de matrices numpy
+# ============================================================
 
-    # Fuselaje: rectángulo redondeado
-    fuselaje = patches.FancyBboxPatch(
-        (-0.6 * escala, -alto_total),
-        ancho_total + 0.2 * escala, alto_total + 0.6 * escala,
-        boxstyle="round,pad=0,rounding_size=0.35",
-        linewidth=2.5, edgecolor=COLOR_FUSELAJE, facecolor="white", zorder=0,
-    )
-    ax.add_patch(fuselaje)
+def parsear_historial(ruta_txt):
+    """
+    Lee un .txt como el que genera la simulación (matrices impresas con el
+    formato por defecto de numpy, pegadas una tras otra sin separador) y
+    devuelve una lista de arrays numpy, uno por cada estado de la grilla.
+    """
+    with open(ruta_txt, "r") as f:
+        contenido = f.read()
 
-    # Nariz del avión (arriba, fila 0)
-    cx = ancho_total / 2 - 0.6 * escala
-    nariz = patches.Polygon(
-        [(cx - ancho_total / 2 - 0.1, 0.3 * escala),
-         (cx + ancho_total / 2 + 0.1, 0.3 * escala),
-         (cx, 1.3 * escala)],
-        closed=True, facecolor=COLOR_FUSELAJE, zorder=0,
-    )
-    ax.add_patch(nariz)
+    bloques = re.findall(r"\[\[.*?\]\]", contenido, re.S)
+    if not bloques:
+        raise ValueError(
+            f"No se encontró ninguna matriz en '{ruta_txt}'. "
+            "¿Es un archivo generado por la simulación?"
+        )
 
-    # Cola del avión (abajo)
-    cola = patches.Rectangle(
-        (cx - 0.35 * escala, -alto_total - 1.1 * escala),
-        0.7 * escala, 0.8 * escala,
-        facecolor=COLOR_FUSELAJE, zorder=0,
-    )
-    ax.add_patch(cola)
+    historial = []
+    for bloque in bloques:
+        filas_n = bloque.count("\n") + 1
+        numeros = [float(x) for x in re.findall(r"[-+]?\d*\.?\d+", bloque)]
+        cols_n = len(numeros) // filas_n
+        historial.append(np.array(numeros).reshape(filas_n, cols_n))
 
-    # Franja del pasillo (visual, para que se note el corredor)
-    col_pasillo_x = cols_por_lado * escala - 0.1 * escala
-    ax.add_patch(patches.Rectangle(
-        (col_pasillo_x, -alto_total - 0.1 * escala),
-        escala + 0.2 * escala, alto_total + 0.2 * escala,
-        facecolor=COLOR_PASILLO, zorder=0.5,
-    ))
+    return historial
 
+
+# ============================================================
+# 2. Dibujo de un cuadro
+# ============================================================
 
 def _dibujar_asiento(ax, x, y, estado, escala=1.0):
-    """
-    Dibuja un asiento en (x, y). estado en {"libre", "ocupado", "nuevo"}.
-    Si está ocupado, dibuja también un muñequito simple adentro.
-    """
     color_map = {
         "libre": (COLOR_LIBRE, COLOR_BORDE_LIBRE),
         "ocupado": (COLOR_OCUPADO, COLOR_BORDE_OCUPADO),
@@ -85,39 +86,33 @@ def _dibujar_asiento(ax, x, y, estado, escala=1.0):
     face, edge = color_map[estado]
     tam = 0.8 * escala
 
-    ax.add_patch(patches.FancyBboxPatch(
+    # Rectangle (esquinas rectas) en vez de FancyBboxPatch: visualmente casi
+    # igual de claro, pero mucho más rápido de dibujar (importa al animar
+    # cientos de asientos en cientos de cuadros).
+    ax.add_patch(patches.Rectangle(
         (x - tam / 2, y - tam / 2), tam, tam,
-        boxstyle="round,pad=0,rounding_size=0.12",
         linewidth=1.8, edgecolor=edge, facecolor=face, zorder=2,
     ))
 
     if estado in ("ocupado", "nuevo"):
-        # Muñequito simple: cabeza (círculo) + cuerpo (triángulo/trapecio)
         ax.add_patch(patches.Circle((x, y + 0.16 * escala), 0.13 * escala,
                                      facecolor="#4E342E", zorder=3))
-        cuerpo = patches.FancyBboxPatch(
+        ax.add_patch(patches.Rectangle(
             (x - 0.18 * escala, y - 0.28 * escala), 0.36 * escala, 0.3 * escala,
-            boxstyle="round,pad=0,rounding_size=0.08",
             facecolor=edge, edgecolor="none", zorder=3,
-        )
-        ax.add_patch(cuerpo)
+        ))
 
 
 def _dibujar_persona_pasillo(ax, x, y, escala=1.0):
-    """Dibuja el muñequito de alguien parado/caminando en el pasillo (violeta,
-    para diferenciarlo claramente de alguien ya sentado en un asiento)."""
-    # halo sutil para que se note que está "en movimiento", no en un asiento
     ax.add_patch(patches.Circle((x, y), 0.34 * escala, facecolor=COLOR_CAMINANDO,
                                  edgecolor=COLOR_BORDE_CAMINANDO, linewidth=1.5,
                                  alpha=0.35, zorder=3))
     ax.add_patch(patches.Circle((x, y + 0.14 * escala), 0.12 * escala,
                                  facecolor="#4E342E", zorder=4))
-    cuerpo = patches.FancyBboxPatch(
+    ax.add_patch(patches.Rectangle(
         (x - 0.15 * escala, y - 0.24 * escala), 0.3 * escala, 0.28 * escala,
-        boxstyle="round,pad=0,rounding_size=0.07",
         facecolor=COLOR_BORDE_CAMINANDO, edgecolor="none", zorder=4,
-    )
-    ax.add_patch(cuerpo)
+    ))
 
 
 def _estado_de_asiento(fila, col, matriz_actual, matriz_anterior):
@@ -128,31 +123,113 @@ def _estado_de_asiento(fila, col, matriz_actual, matriz_anterior):
     return "ocupado"
 
 
-def render_frame(ax, matriz_actual, matriz_anterior, paso, total_pasos, titulo, escala=1.0):
+def _dibujar_avion_esquematico(ax, filas, cols, escala=1.0):
+    """Fallback: rectángulo redondeado con nariz/cola triangulares, por si no
+    se quiere usar la silueta vectorial."""
+    ancho_util = (cols - 1) * escala
+    alto_total = filas * escala
+    margen = 0.6 * escala
+
+    ax.add_patch(patches.FancyBboxPatch(
+        (-margen, -alto_total - 0.1 * escala),
+        ancho_util + 2 * margen, alto_total + 0.7 * escala,
+        boxstyle="round,pad=0,rounding_size=0.35",
+        linewidth=2.5, edgecolor=COLOR_FUSELAJE, facecolor="white", zorder=0,
+    ))
+    cx = ancho_util / 2
+    ax.add_patch(patches.Polygon(
+        [(-margen, 0.3 * escala), (ancho_util + margen, 0.3 * escala), (cx, 1.3 * escala)],
+        closed=True, facecolor=COLOR_FUSELAJE, zorder=0,
+    ))
+    ax.add_patch(patches.Rectangle(
+        (cx - 0.35 * escala, -alto_total - 1.1 * escala), 0.7 * escala, 0.8 * escala,
+        facecolor=COLOR_FUSELAJE, zorder=0,
+    ))
+    ax.add_patch(patches.Rectangle(
+        (cx - 0.5 * escala, -alto_total - 0.1 * escala), escala, alto_total + 0.2 * escala,
+        facecolor=COLOR_PASILLO, zorder=0.5,
+    ))
+
+
+def _calcular_extent_vector(filas, cols, escala, ruta_imagen):
+    """Calcula el extent (left, right, bottom, top) para envolver la grilla
+    con la silueta vectorial, sin dibujar nada todavía."""
+    import matplotlib.image as mpimg
+    img = mpimg.imread(ruta_imagen)
+    H, W = img.shape[0], img.shape[1]
+
+    # Medido como FRACCIÓN del ancho/alto total de la imagen (no en píxeles
+    # absolutos), para que siga funcionando bien sin importar la resolución
+    # real del archivo (por ejemplo, si se reemplaza por una versión más
+    # liviana). Corresponde a la zona del fuselaje con ancho constante,
+    # entre las alas y el cono de cola.
+    TUBE_X0_FRAC, TUBE_X1_FRAC = 882 / 2010, 1127 / 2010
+    TUBE_Y0_FRAC, TUBE_Y1_FRAC = 375 / 2261, 1620 / 2261
+
+    tube_width_px = (TUBE_X1_FRAC - TUBE_X0_FRAC) * W
+    tube_cx_px = (TUBE_X0_FRAC + TUBE_X1_FRAC) / 2 * W
+    tube_cy_px = (TUBE_Y0_FRAC + TUBE_Y1_FRAC) / 2 * H
+
+    ancho_util = (cols - 1) * escala
+    ancho_deseado_tubo = ancho_util + 1.1 * escala
+    esc_px = ancho_deseado_tubo / tube_width_px
+
+    cx = ancho_util / 2
+    centro_y_datos = -(filas - 1) * escala / 2
+
+    left = cx - tube_cx_px * esc_px
+    right = cx + (W - tube_cx_px) * esc_px
+    top = centro_y_datos + tube_cy_px * esc_px
+    bottom = centro_y_datos - (H - tube_cy_px) * esc_px
+    return left, right, bottom, top, img
+
+
+def _dibujar_avion_vector(ax, filas, cols, escala, ruta_imagen):
+    left, right, bottom, top, img = _calcular_extent_vector(filas, cols, escala, ruta_imagen)
+    ax.imshow(img, extent=(left, right, bottom, top), zorder=0, origin="upper")
+
+    col_pasillo = cols // 2
+    ax.add_patch(patches.Rectangle(
+        (col_pasillo * escala - 0.45 * escala, bottom),
+        0.9 * escala, top - bottom,
+        facecolor=COLOR_PASILLO, alpha=0.55, zorder=0.5, edgecolor="none",
+    ))
+    return left, right, bottom, top
+
+
+def render_frame(ax, matriz_actual, matriz_anterior, paso, total_pasos, titulo, escala=1.0,
+                  fuselaje_vector=None):
     ax.clear()
     filas, cols = matriz_actual.shape
     col_pasillo = cols // 2
-    cols_por_lado = col_pasillo  # asientos a cada lado del pasillo
 
-    _dibujar_avion(ax, filas, cols_por_lado, escala)
+    if fuselaje_vector is not None:
+        limites = _dibujar_avion_vector(ax, filas, cols, escala, fuselaje_vector)
+    else:
+        _dibujar_avion_esquematico(ax, filas, cols, escala)
+        limites = None
 
-    x_pasillo = col_pasillo * escala + 0.5 * escala
-
+    x_pasillo = col_pasillo * escala
     for f in range(filas):
         y = -f * escala
         for c in range(cols):
+            x = c * escala
             if c == col_pasillo:
                 if matriz_actual[f, col_pasillo] == 1:
                     _dibujar_persona_pasillo(ax, x_pasillo, y, escala)
                 continue
-            x = c * escala if c < col_pasillo else (c) * escala + escala  # deja hueco del pasillo
             estado = _estado_de_asiento(f, c, matriz_actual, matriz_anterior)
             _dibujar_asiento(ax, x, y, estado, escala)
-        # número de fila a la izquierda
         ax.text(-0.85 * escala, y, str(f + 1), fontsize=7, ha="right", va="center", color="#555")
 
-    ax.set_xlim(-1.3 * escala, (cols) * escala + 0.8 * escala)
-    ax.set_ylim(-filas * escala - 1.4 * escala, 1.6 * escala)
+    ancho_util = (cols - 1) * escala
+    if limites is not None:
+        left, right, bottom, top = limites
+        ax.set_xlim(left - 0.2 * escala, right + 0.2 * escala)
+        ax.set_ylim(bottom - 0.2 * escala, top + 0.2 * escala)
+    else:
+        ax.set_xlim(-1.3 * escala, ancho_util + 1.3 * escala)
+        ax.set_ylim(-filas * escala - 1.4 * escala, 1.6 * escala)
     ax.set_aspect("equal")
     ax.axis("off")
 
@@ -163,56 +240,105 @@ def render_frame(ax, matriz_actual, matriz_anterior, paso, total_pasos, titulo, 
         fontsize=12, fontweight="bold", color="#263238",
     )
 
-    # Leyenda
+
+def _armar_leyenda(fig):
+    """Se llama UNA sola vez (no en cada cuadro): fig.legend() no se borra
+    con ax.clear(), así que no hace falta reconstruirla por cuadro."""
     legend_items = [
         patches.Patch(facecolor=COLOR_LIBRE, edgecolor=COLOR_BORDE_LIBRE, label="Asiento libre"),
         patches.Patch(facecolor=COLOR_NUEVO, edgecolor=COLOR_BORDE_NUEVO, label="Se acaba de sentar"),
         patches.Patch(facecolor=COLOR_OCUPADO, edgecolor=COLOR_BORDE_OCUPADO, label="Ya sentado"),
         patches.Patch(facecolor=COLOR_CAMINANDO, edgecolor=COLOR_BORDE_CAMINANDO, label="Caminando"),
     ]
-    ax.legend(handles=legend_items, loc="upper center", bbox_to_anchor=(0.5, 0.015),
-              ncol=2, fontsize=8, frameon=False)
+    fig.legend(handles=legend_items, loc="lower center", ncol=2, fontsize=8, frameon=False)
 
 
-def animar_embarque(historial, filename="embarque.gif", titulo="Embarque del avión",
-                     fps=2, escala=1.0, repeat_last=6):
+# ============================================================
+# 3. Función pública: recibe el .txt, guarda el GIF en resultados/visualizaciones
+# ============================================================
+
+def animar_embarque(ruta_txt, nombre_salida=None, titulo="Embarque del avión",
+                     fps=10, escala=1.0, repeat_last=6,
+                     fuselaje_vector=FUSELAJE_VECTOR_DEFAULT,
+                     carpeta_resultados="../resultados", saltar_pasos=1):
     """
-    Genera un GIF animado a partir del historial de matrices de asientos.
+    Genera la animación del embarque a partir del .txt de la simulación.
 
     Parámetros
     ----------
-    historial : list[np.ndarray]
-        Lista de matrices (filas x columnas) de 0s y 1s, una por cada paso
-        de la simulación.
-    filename : str
-        Ruta donde guardar el GIF.
+    ruta_txt : str | Path
+        Ruta al .txt con el historial de matrices (el que graba
+        ambiente_fisico.py).
+    nombre_salida : str, opcional
+        Nombre del archivo GIF a generar (por ejemplo "steffen.gif"). Si no
+        se pasa, se usa el nombre del .txt de entrada con extensión .gif.
     titulo : str
-        Título a mostrar (por ejemplo, el nombre de la política: "Steffen", etc).
+        Título a mostrar arriba de la animación (por ejemplo el nombre de
+        la política de embarque).
     fps : int
-        Cuadros por segundo del GIF (más bajo = más lento / más fácil de seguir).
+        Cuadros por segundo del GIF.
     escala : float
-        Tamaño relativo de los asientos (no suele hacer falta tocarlo).
+        Tamaño relativo de los asientos.
     repeat_last : int
-        Cuántos cuadros extra repetir al final (para que el GIF haga una
-        pausa visible cuando termina el embarque, en vez de cortar de golpe).
+        Cuadros extra repitiendo el último estado, para que el GIF no corte
+        de golpe al terminar.
+    fuselaje_vector : str | None
+        Ruta a la silueta del avión a usar como fuselaje. Por default usa la
+        que viene con este módulo (analisis/assets/avion_vector.png). Pasar
+        None para usar el fuselaje esquemático simple en su lugar.
+    carpeta_resultados : str | Path
+        Carpeta raíz de resultados; el GIF se guarda dentro de
+        "<carpeta_resultados>/visualizaciones/" (se crea si no existe).
+    saltar_pasos : int
+        Si la simulación tiene muchísimos pasos (por ejemplo, con la
+        caminata por el pasillo contando un paso por cada fila recorrida),
+        usar saltar_pasos=2 (o más) para tomar 1 de cada N estados y generar
+        el GIF más rápido, sin perder demasiada fluidez visual.
+
+    Devuelve
+    --------
+    str : la ruta del GIF generado.
     """
-    historial = [np.asarray(m) for m in historial]
+    ruta_txt = Path(ruta_txt)
+    historial_completo = parsear_historial(ruta_txt)
+    historial = historial_completo[::saltar_pasos]
+    if historial[-1] is not historial_completo[-1]:
+        historial.append(historial_completo[-1])  # no perderse el estado final
+
+    carpeta_viz = Path(carpeta_resultados) / "visualizaciones"
+    carpeta_viz.mkdir(parents=True, exist_ok=True)
+
+    if nombre_salida is None:
+        nombre_salida = ruta_txt.stem + ".gif"
+    ruta_salida = carpeta_viz / nombre_salida
+
     frames = historial + [historial[-1]] * repeat_last
     total_pasos = len(historial)
-
     filas, cols = historial[0].shape
-    alto_fig = max(6, filas * 0.28)
-    fig, ax = plt.subplots(figsize=(4.5, alto_fig))
+
+    if fuselaje_vector is not None:
+        left, right, bottom, top, _ = _calcular_extent_vector(filas, cols, escala, fuselaje_vector)
+        alto_fig = 8.0
+        ancho_fig = alto_fig * ((right - left) / (top - bottom))
+    else:
+        alto_fig, ancho_fig = max(6, filas * 0.32), 4.8
+
+    fig, ax = plt.subplots(figsize=(ancho_fig, alto_fig))
     fig.patch.set_facecolor("white")
+    fig.subplots_adjust(bottom=0.08)  # deja lugar para la leyenda fija
+    _armar_leyenda(fig)
 
     def update(i):
         actual = frames[i]
         anterior = frames[i - 1] if i > 0 else None
         paso_mostrado = min(i + 1, total_pasos)
-        render_frame(ax, actual, anterior, paso_mostrado, total_pasos, titulo, escala)
+        render_frame(ax, actual, anterior, paso_mostrado, total_pasos, titulo, escala,
+                     fuselaje_vector=fuselaje_vector)
 
     anim = FuncAnimation(fig, update, frames=len(frames), interval=1000 / fps)
-    anim.save(filename, writer=PillowWriter(fps=fps))
+    anim.save(str(ruta_salida), writer=PillowWriter(fps=fps), dpi=90)
     plt.close(fig)
-    print(f"GIF guardado en: {filename}  ({len(frames)} cuadros, {total_pasos} pasos de simulación)")
-    return filename
+
+    print(f"GIF guardado en: {ruta_salida}  ({len(frames)} cuadros, {total_pasos} pasos mostrados "
+          f"de {len(historial_completo)} pasos totales de la simulación)")
+    return str(ruta_salida)
