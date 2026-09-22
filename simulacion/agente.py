@@ -61,6 +61,8 @@ class PassengerAgent:
         # Indica los segundos restantes que le quedan al pasajero
         # para concretar la acción que esta llevando a cabo
         self.timer: int = 0
+        # Contador específico para esperar
+        self.waiting_timer: int = 0
 
         # Indica si el pasajero guardo el equipaje de mano solo si es que
         # efectivamente posee equipaje de mano en primer lugar
@@ -89,6 +91,10 @@ class PassengerAgent:
 
         # Si se encuentra caminando entonces que avance hacia su asiento
         if self.state == 'walking':
+            if (self.timer < 0):
+                if self.carryon: self.timer = 6
+                else: self.timer = 3
+
             self.walk_forward()
 
         # Si se encuentra guardando el equipaje de mano entonces que lo siga haciendo hasta terminar
@@ -164,8 +170,10 @@ class PassengerAgent:
         if self.cell == None:
             next_cell = (0, 2)
 
+
         # En caso de que ya posea una posición...
         else:
+            
             cell_row, cell_col = self.cell
             seat_row, seat_col = self.seat
 
@@ -198,14 +206,28 @@ class PassengerAgent:
 
                 # Si debo pedirle a un pasajero que se levante para yo poder pasar
                 if cell_row == next_row and next_col != cell_col:
-                    # Si ya está sentado, le solicitmaos que se levante de su asiento
+                    # Si ya está sentado, le solicitamos que se levante de su asiento
                     adjacent_passenger = self.plane.passenger_at_seat.get(next_cell)
                     if adjacent_passenger != None and adjacent_passenger.state == 'seated':
                         adjacent_passenger.receive_get_up_request()
+                else:
+                    self.waiting_timer = 3
+                    if self.carryon: self.timer = 6
+                    else: self.timer = 3
                 # Si no, es alguien delante en el pasillo no se hace nada
                 # más que esperar a que se mueva. En ambos casos,
                 # se queda esperando sin hacer nada un turno
             # Si no tengo una posición asignada no tengo nada por hacer...
+            return
+
+        # Si esta esperando a poder avanzar
+        if (self.waiting_timer > 0):
+            self.waiting_timer -= 1
+            return
+
+        # Si todavia esta avanzando
+        if (self.timer != 0):
+            self.timer -= 1
             return
 
         # Solo liberamos la celda anterior si previamente el pasajero tenía una celda asignada

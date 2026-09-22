@@ -6,6 +6,7 @@
 
 # Excluir los resultados
 resultados/*.txt
+resultados/simulaciones/*.txt
 
 # Excluir __pycache__
 **/__pycache__/

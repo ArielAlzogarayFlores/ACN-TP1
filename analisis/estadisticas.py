@@ -9,5 +9,6 @@ from runner import run_simulations, save_results
 datos:list = list()
 
 for i in range(11):
-    datos.append(run_simulations(n_simulations=1000, n_passengers=100, p_carryon=(i/10)))
+    datos.append(run_simulations(n_simulations=5000, n_passengers=100, p_carryon=(i/10)))
     save_results(results = datos[i], n_passengers=100, p_carryon=(i/10), output_dir='resultados')
+

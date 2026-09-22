@@ -20,7 +20,7 @@ METHODS = ['rand', 'btf', 'wilma', 'stfn']
 # Límite de segundos simulados, para que una simulación que se trabe no
 # corra para siempre. Con 100 pasajeros la política más lenta (btf) ronda
 # los 1100 segundos, así que 2000 deja margen de sobra
-MAX_STEPS = 2000
+MAX_STEPS = 3000
 
 # Método para correr una única simulación
 # Devuelve el tiempo total de embarque (en segundos)
