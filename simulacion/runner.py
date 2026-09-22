@@ -1,6 +1,15 @@
 # Para crear la carpeta de resultados y armar la ruta del archivo
 import os
 
+# Para ubicar la raíz del repositorio sin depender del directorio de trabajo
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+# Módulo con todas las rutas del proyecto (también deja simulacion/ y
+# analisis/ en el path, así los imports de abajo funcionan siempre)
+import rutas
+
 # Para ponerle al archivo de resultados la fecha y hora en que se generó
 from datetime import datetime
 
@@ -13,6 +22,12 @@ from ambiente_fisico import PlaneModel
 
 # Importamos las funciones de visualización
 from animacion import animar_embarque
+
+# Para calcular el desvío estándar de los tiempos
+import numpy as np
+
+# Para el intervalo de confianza del promedio
+from scipy import stats
 
 # Políticas de embarque que simulamos por defecto
 METHODS = ['rand', 'btf', 'wilma', 'stfn']
@@ -59,6 +74,7 @@ def run_and_show(
     n_passengers: int = 100,
     p_carryon: float = 0.5,
     method:str = 'rand',
+    saltar_pasos: int = 1,
 ) -> str:
     """
     Corre una simulación con la política seleccionada y guarda un GIF con su visualización.
@@ -67,6 +83,9 @@ def run_and_show(
         n_passengers:  cantidad de pasajeros.
         p_carryon:     probabilidad de que un pasajero tenga carry-on.
         method:       política a simular.
+        saltar_pasos: dibuja 1 de cada N segundos simulados. Generar el GIF es
+                      lo más lento de todo, así que con 3 se tarda un tercio y
+                      casi no se nota en la animación. Con 1 se ven todos.
 
     """
     # Creamos el avión con sus pasajeros según la política elegida
@@ -76,9 +95,9 @@ def run_and_show(
     salida = contextlib.redirect_stdout(io.StringIO())
 
     # Creamos un archivo de texto en el cual guardamos el plane_grid para cada momento en el tiempo
-    output_dir: str = '../resultados'
+    rutas.preparar_carpetas()
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = os.path.join(output_dir, f'simulaciones/sim_record_{timestamp}.txt')
+    filename = rutas.SIMULACIONES / f'sim_record_{timestamp}.txt'
     sr = open(file=filename, mode='x')
 
     # Avanzamos la simulación segundo a segundo hasta que todos estén
@@ -100,6 +119,8 @@ def run_and_show(
         ruta_txt=filename,
         nombre_salida=f"{method}.gif",   # p.ej. "steffen.gif", "back_to_front.gif"
         titulo=f"Política: {method}",
+        carpeta_resultados=rutas.RESULTADOS,
+        saltar_pasos=saltar_pasos,
     )
     return ruta_gif
 
@@ -159,15 +180,19 @@ def save_results(
     results: dict[str, list[int]],
     n_passengers: int,
     p_carryon: float,
-    output_dir: str = '../resultados',
+    output_dir: str | None = None,
 ) -> str:
 
+    # Si no nos dicen dónde guardar, usamos la carpeta resultados/ del repo
+    if output_dir is None:
+        output_dir = rutas.RESULTADOS # type: ignore
+
     # Creamos la carpeta de resultados si todavía no existe
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True) # type: ignore
 
     # Le ponemos al archivo la fecha y hora para no pisar resultados anteriores
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = os.path.join(output_dir, f'resultados_{timestamp}.txt')
+    filename = os.path.join(output_dir, f'resultados_{timestamp}.txt') # type: ignore
 
     # Todas las políticas tienen la misma cantidad de simulaciones, así que
     # la tomamos de la primera
@@ -182,9 +207,25 @@ def save_results(
 
         # Un bloque por política con sus estadísticas y todos sus tiempos
         for method, times in results.items():
-            avg = sum(times) / len(times)
+            avg = np.mean(times)
+
+            # Desvío muestral: ddof=1 divide por (n-1), porque las simulaciones
+            # son una muestra y no toda la población de embarques posibles
+            # (por defecto numpy usa ddof=0, que sería el desvío poblacional)
+            desvio = np.std(times, ddof=1) if len(times) > 1 else 0.0
+
             f.write(f"[{method}]\n")
             f.write(f"  Promedio : {avg:.1f}s\n")
+            f.write(f"  Desvío   : {desvio:.1f}s\n")
+
+            # Intervalo de confianza del 95% para el promedio: con qué precisión
+            # estimamos el tiempo medio de esta política a partir de n simulaciones.
+            # Usamos la distribución t porque no conocemos el desvío poblacional
+            if len(times) > 1:
+                bajo, alto = stats.t.interval(0.95, len(times) - 1,
+                                              loc=avg, scale=stats.sem(times))
+                f.write(f"  IC 95%   : [{bajo:.1f}s, {alto:.1f}s]\n")
+
             f.write(f"  Mínimo   : {min(times)}s\n")
             f.write(f"  Máximo   : {max(times)}s\n")
             f.write(f"  Tiempos  : {times}\n\n")
