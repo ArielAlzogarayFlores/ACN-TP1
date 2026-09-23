@@ -15,12 +15,18 @@ class PlaneModel:
     - 'rand' para la política aleatoria.
     - 'wilma' para la política Window-Middle-Aisle.
     - 'stfn' para el método de Steffen.
+
+    Para seleccionar el tipo de pasajero, se usa agent_class:
+    - PassengerAgent de agente.py (por defecto) para el modelo base.
+    - PassengerAgent de bonus_agente.py para el modelo con velocidades
+      heterogéneas (o cualquier otra clase con la misma interfaz).
     '''
 
     # Método constructor de la clase avión
     # n es la cantidad de pasajeros, p la probabilidad de que un pasajero tenga
-    # equipaje de mano y onboarding_method la política de embarque a utilizar
-    def __init__(self, n=100, p=0.5, onboarding_method='rand'):
+    # equipaje de mano, onboarding_method la política de embarque a utilizar
+    # y agent_class la clase de pasajero con la que se puebla el avión
+    def __init__(self, n=100, p=0.5, onboarding_method='rand', agent_class=PassengerAgent):
 
         # Atributos de la clase avión
 
@@ -111,6 +117,9 @@ class PlaneModel:
         # los primeros n asientos de la cola
         self.queue = self.queue[:n]
 
+        # Indica la clase de agente con la que se crean los pasajeros
+        self.agent_class = agent_class
+
         # Indica la lista de agentes pasajeros, en el mismo orden que la cola
         self.agents: list[PassengerAgent] = list()
 
@@ -118,7 +127,7 @@ class PlaneModel:
         for seat in self.queue:
             # Con probabilidad p el pasajero tiene equipaje de mano
             carryon = bool(random.choices([0, 1], weights=[1 - p, p])[0])
-            pasajero = PassengerAgent(seat=seat, carryon=carryon, plane=self)
+            pasajero = agent_class(seat=seat, carryon=carryon, plane=self)
             self.agents.append(pasajero)
             self.passenger_at_seat[seat] = pasajero
 

@@ -32,7 +32,7 @@ GET_UP_MIN = 3
 GET_UP_MAX = 5
 
 # El agente de nuestro modelo es el pasajero
-class PassengerAgent:
+class BonusPassengerAgent:
 
     # Método constructor de la clase pasajero
     # seat es el asiento del pasajero, carryon indica si tiene equipaje de mano

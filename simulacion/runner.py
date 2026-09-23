@@ -20,6 +20,9 @@ import contextlib
 # Importamos el ambiente de nuestro modelo, el avión
 from ambiente_fisico import PlaneModel
 
+# Importamos el agente base, que es el que se usa por defecto
+from agente import PassengerAgent
+
 # Importamos las funciones de visualización
 from animacion import animar_embarque
 
@@ -37,14 +40,23 @@ METHODS = ['rand', 'btf', 'wilma', 'stfn']
 # los 1100 segundos, así que 2000 deja margen de sobra
 MAX_STEPS = 3000
 
+# Método auxiliar para distinguir los archivos generados con un agente que no
+# es el base (por ejemplo el de bonus_agente.py). Para el agente base devuelve
+# '' así los nombres de archivo quedan exactamente como antes
+def _sufijo_agente(agent_class) -> str:
+    if agent_class is PassengerAgent:
+        return ''
+    return '_' + agent_class.__module__
+
 # Método para correr una única simulación
 # Devuelve el tiempo total de embarque (en segundos)
 # Si verbose es True, se muestran las acciones de cada pasajero paso a paso
 # y el tiempo final; si es False, la simulación corre en silencio
-def run_single(n_passengers: int, p_carryon: float, method: str, verbose: bool = False) -> int:
+def run_single(n_passengers: int, p_carryon: float, method: str, verbose: bool = False,
+               agent_class=PassengerAgent) -> int:
 
     # Creamos el avión con sus pasajeros según la política elegida
-    model = PlaneModel(n=n_passengers, p=p_carryon, onboarding_method=method)
+    model = PlaneModel(n=n_passengers, p=p_carryon, onboarding_method=method, agent_class=agent_class)
 
     # Si no queremos ver los prints de los agentes, redirigimos la salida
     # a un buffer que después se descarta
@@ -75,6 +87,7 @@ def run_and_show(
     p_carryon: float = 0.5,
     method:str = 'rand',
     saltar_pasos: int = 1,
+    agent_class=PassengerAgent,
 ) -> str:
     """
     Corre una simulación con la política seleccionada y guarda un GIF con su visualización.
@@ -86,10 +99,14 @@ def run_and_show(
         saltar_pasos: dibuja 1 de cada N segundos simulados. Generar el GIF es
                       lo más lento de todo, así que con 3 se tarda un tercio y
                       casi no se nota en la animación. Con 1 se ven todos.
+        agent_class:  clase de pasajero a usar (por defecto el agente base).
 
     """
     # Creamos el avión con sus pasajeros según la política elegida
-    model = PlaneModel(n=n_passengers, p=p_carryon, onboarding_method=method)
+    model = PlaneModel(n=n_passengers, p=p_carryon, onboarding_method=method, agent_class=agent_class)
+
+    # Sufijo para no pisar el GIF del modelo base ('' si es el agente base)
+    sufijo = _sufijo_agente(agent_class)
 
     # Redirigimos la salida a un buffer que después se descarta
     salida = contextlib.redirect_stdout(io.StringIO())
@@ -117,8 +134,8 @@ def run_and_show(
 
     ruta_gif = animar_embarque(
         ruta_txt=filename,
-        nombre_salida=f"{method}.gif",   # p.ej. "steffen.gif", "back_to_front.gif"
-        titulo=f"Política: {method}",
+        nombre_salida=f"{method}{sufijo}.gif",   # p.ej. "stfn.gif", "stfn_bonus_agente.gif"
+        titulo=f"Política: {method}{' (bonus)' if sufijo else ''}",
         carpeta_resultados=rutas.RESULTADOS,
         saltar_pasos=saltar_pasos,
     )
@@ -131,6 +148,7 @@ def run_simulations(
     p_carryon: float = 0.5,
     methods: list[str] | None = None,
     verbose: bool = False,
+    agent_class=PassengerAgent,
 ) -> dict[str, list[int]]:
     """
     Corre n_simulations por cada política de embarque.
@@ -141,6 +159,7 @@ def run_simulations(
         p_carryon:     probabilidad de que un pasajero tenga carry-on.
         methods:       lista de políticas a simular (por defecto las 4).
         verbose:       si True, imprime el resultado de cada simulación.
+        agent_class:   clase de pasajero a usar (por defecto el agente base).
 
     Retorna: diccionario con la política como clave y la lista de demoras totales por simulación.
 
@@ -165,7 +184,7 @@ def run_simulations(
             # Cada simulación individual corre siempre en silencio: con
             # verbose acá solo mostramos el resumen de cada una, no las
             # miles de acciones de los pasajeros
-            time = run_single(n_passengers, p_carryon, method, verbose=False)
+            time = run_single(n_passengers, p_carryon, method, verbose=False, agent_class=agent_class)
             results[method].append(time)
 
             if verbose:
@@ -181,6 +200,7 @@ def save_results(
     n_passengers: int,
     p_carryon: float,
     output_dir: str | None = None,
+    etiqueta: str = '',
 ) -> str:
 
     # Si no nos dicen dónde guardar, usamos la carpeta resultados/ del repo
@@ -192,7 +212,10 @@ def save_results(
 
     # Le ponemos al archivo la fecha y hora para no pisar resultados anteriores
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = os.path.join(output_dir, f'resultados_{timestamp}.txt') # type: ignore
+    # Si se pasa una etiqueta (p.ej. 'bonus') se agrega al nombre del archivo,
+    # así se pueden distinguir y filtrar con leer_carpeta(patron='resultados_bonus_*.txt')
+    prefijo = f'resultados_{etiqueta}_' if etiqueta else 'resultados_'
+    filename = os.path.join(output_dir, f'{prefijo}{timestamp}.txt') # type: ignore
 
     # Todas las políticas tienen la misma cantidad de simulaciones, así que
     # la tomamos de la primera
