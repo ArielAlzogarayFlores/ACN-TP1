@@ -249,7 +249,7 @@ class Barrido:
         return [float(p) for p in esperados if p not in presentes]
 
 
-def leer_carpeta(carpeta=None, patron: str = "resultados_*.txt",
+def leer_carpeta(carpeta=None, patron: str = "p_*.txt",
                  avisar_faltantes: bool = True) -> Barrido:
     """
     Lee todos los archivos de resultados de una carpeta y los ordena por
