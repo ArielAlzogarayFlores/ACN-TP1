@@ -1,3 +1,5 @@
+# Generamos las muestras grandes que usamos para hacer todas nuestras estimaciones.
+# NO HACE FALTA CORRER ESTE ARCHIVO DE NUEVO. Las estimaciones ya están guardadas en resultados/grandes_simulaciones.
 # Para ubicar la raíz del repositorio sin depender del directorio de trabajo
 import sys
 from pathlib import Path
@@ -7,6 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 # analisis/ en el path, así el import de abajo funciona siempre)
 import rutas
 
+# Generamos las muestras
 
 from runner import run_simulations, save_results
 
