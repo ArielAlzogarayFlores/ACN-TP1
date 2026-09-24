@@ -6,3 +6,15 @@
 
 # Excluir __pycache__
 **/__pycache__/
+*.gif
+resultados/visualizaciones/btf.gif
+resultados/simulaciones/sim_record_20260923_210619.txt
+resultados/simulaciones/sim_record_20260923_210533.txt
+resultados/simulaciones/sim_record_20260923_204825.txt
+resultados/simulaciones/sim_record_20260923_204622.txt
+resultados/simulaciones/sim_record_20260923_203533.txt
+resultados/resultados_bonus_20260923_210619.txt
+resultados/resultados_bonus_20260923_204622.txt
+resultados/resultados_20260923_204825.txt
+resultados/resultados_20260923_203533.txt
+notebooks/desarrollo.ipynb
